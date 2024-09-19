@@ -3,11 +3,127 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>memory game</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Aplicación WebRTC</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            margin: 5px;
+            padding: 10px;
+            font-size: 16px;
+        }
+        #localVideo, #remoteVideo {
+            width: 300px;
+            height: 225px;
+            background-color: #ddd;
+            margin: 10px 0;
+        }
+    </style>
 </head>
 <body>
- <div class="cuadricula" id="cuadricula"></div>
-<script src="app.js"></script>
+    <div class="container">
+        <h1>Aplicación WebRTC</h1>
+        <video id="localVideo" autoplay muted></video>
+        <video id="remoteVideo" autoplay></video>
+        <br>
+        <button id="startButton">Iniciar</button>
+        <button id="callButton">Llamar</button>
+        <button id="hangupButton">Colgar</button>
+    </div>
+
+    <script>
+        const startButton = document.getElementById('startButton');
+        const callButton = document.getElementById('callButton');
+        const hangupButton = document.getElementById('hangupButton');
+        const localVideo = document.getElementById('localVideo');
+        const remoteVideo = document.getElementById('remoteVideo');
+
+        let localStream;
+        let remoteStream;
+        let peerConnection;
+
+        const configuration = {'iceServers': [{'urls': 'stun:stun.l.google.com:19302'}]};
+
+        startButton.onclick = start;
+        callButton.onclick = call;
+        hangupButton.onclick = hangup;
+
+        async function start() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({audio: true, video: true});
+                localVideo.srcObject = stream;
+                localStream = stream;
+                startButton.disabled = true;
+                callButton.disabled = false;
+            } catch (e) {
+                console.error('Error accediendo a los dispositivos de media:', e);
+            }
+        }
+
+        async function call() {
+            callButton.disabled = true;
+            hangupButton.disabled = false;
+
+            peerConnection = new RTCPeerConnection(configuration);
+            
+            localStream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, localStream);
+            });
+
+            peerConnection.ontrack = event => {
+                remoteVideo.srcObject = event.streams[0];
+                remoteStream = event.streams[0];
+            };
+
+            try {
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                // En una aplicación real, aquí enviarías la oferta al otro peer
+                // Para esta demo, simularemos la respuesta del otro peer
+                setTimeout(() => {
+                    handleAnswer(offer);
+                }, 1000);
+            } catch (e) {
+                console.error('Error creando la oferta:', e);
+            }
+        }
+
+        async function handleAnswer(offer) {
+            try {
+                await peerConnection.setRemoteDescription(offer);
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                // En una aplicación real, aquí enviarías la respuesta al otro peer
+            } catch (e) {
+                console.error('Error creando la respuesta:', e);
+            }
+        }
+
+        function hangup() {
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+            localStream.getTracks().forEach(track => track.stop());
+            localVideo.srcObject = null;
+            remoteVideo.srcObject = null;
+            startButton.disabled = false;
+            callButton.disabled = true;
+            hangupButton.disabled = true;
+        }
+    </script>
 </body>
 </html>
